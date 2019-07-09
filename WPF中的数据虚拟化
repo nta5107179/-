@@ -1,0 +1,38 @@
+<!--开启虚拟化及像素位移模式-->
+<ListBox x:Name="lv_datagroupconfig" DataContext="{Binding DataContext, ElementName=dp_datagroupconfig}" ItemsSource="{Binding Path=groupList}"
+          VirtualizingStackPanel.IsVirtualizing="True" 
+          ScrollViewer.CanContentScroll="True" 
+          VirtualizingPanel.ScrollUnit="Pixel" 
+          VirtualizingPanel.VirtualizationMode="Recycling" 
+          BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+    <ListBox.Resources>
+        <Style TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="Transparent" /><!--设定颜色-->
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent" /><!--设定颜色-->
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ListBox.Resources>
+    <ListBox.ItemTemplate>
+        <DataTemplate>
+            <GroupBox Header="{Binding Path=name}" VerticalAlignment="Top" DockPanel.Dock="Top">
+                <DockPanel Margin="5
+                </DockPanel>
+            </GroupBox>
+        </DataTemplate>
+    </ListBox.ItemTemplate>
+</ListBox>
+后端绑定方式不变
