@@ -39,6 +39,7 @@ C#中的那些全局异常捕获
                 }
                 Environment.Exit(0);
             });
+	    //单例
             Startup += new StartupEventHandler(delegate(object sender, StartupEventArgs e)
             {
                 bool ret;
