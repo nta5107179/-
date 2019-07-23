@@ -1,30 +1,55 @@
 C#中的那些全局异常捕获
 1.WPF全局捕获异常
-    public partial class App : Application
-    {
-        public App()
-        {
-	    // 在异常由应用程序引发但未进行处理时发生。主要指的是UI线程。
-            this.DispatcherUnhandledException += new System.Windows.Threading.DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
-	//  当某个异常未被捕获时出现。主要指的是非UI线程
-            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CurrentDomain_UnhandledException);
-        }
-        void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
-        {
-//可以记录日志并转向错误bug窗口友好提示用户
-            if (e.ExceptionObject is System.Exception)
+    //グローバル異常を捕まる
+            //子线程异常全局捕获
+            this.DispatcherUnhandledException += new System.Windows.Threading.DispatcherUnhandledExceptionEventHandler(delegate (object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
             {
-                Exception ex =(System.Exception)e.ExceptionObject;
-                MessageBox.Show(ex.Message);  
-            }
-        }
-        void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
-        {
-//可以记录日志并转向错误bug窗口友好提示用户
-            e.Handled = true;
-            MessageBox.Show("消息:"+e.Exception.Message+"\r\n"+e.Exception.StackTrace);
-            
-        }
+                e.Handled = true;
+                SysLogModel syslog = Include.CreateSysLogModel(
+                    ConfigLogPathType.RSM_SYSERROR,
+                    e.Exception.Message + e.Exception.StackTrace);
+                syslog.content = e.Exception.Message + e.Exception.StackTrace;
+                m_incLog.LogSave(syslog);
+                Environment.Exit(0);
+            });
+            //主线程异常全局捕获
+            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(delegate (object sender, UnhandledExceptionEventArgs e)
+            {
+	    	//异常处理
+                if (e.ExceptionObject is System.Exception)
+                {
+                    Exception ex = (System.Exception)e.ExceptionObject;
+                    SysLogModel syslog = Include.CreateSysLogModel(
+                        ConfigLogPathType.RSM_SYSERROR,
+                        ex.Message + ex.StackTrace);
+                    m_incLog.LogSave(syslog);
+                    Environment.Exit(0);
+                }
+            });
+            //异步程序异常全局捕获（Task）
+            TaskScheduler.UnobservedTaskException += new EventHandler<UnobservedTaskExceptionEventArgs>(delegate(object sender, UnobservedTaskExceptionEventArgs e)
+            {
+                //异常处理
+                foreach (Exception ex in e.Exception.InnerExceptions)
+                {
+                    SysLogModel syslog = Include.CreateSysLogModel(
+                        ConfigLogPathType.RSM_SYSERROR,
+                        ex.Message + ex.StackTrace);
+                    m_incLog.LogSave(syslog);
+                }
+                Environment.Exit(0);
+            });
+            Startup += new StartupEventHandler(delegate(object sender, StartupEventArgs e)
+            {
+                bool ret;
+                mutex = new System.Threading.Mutex(true, "ReceiveServerMonitoring", out ret);
+
+                if (!ret)
+                {
+                    MessageBox.Show("应用程序已存在");
+                    Environment.Exit(0);
+                }
+            });
 2.winform捕获全局异常
     static class Program
     {
