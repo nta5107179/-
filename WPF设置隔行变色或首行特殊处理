@@ -1,0 +1,29 @@
+<!--AlternationCount=999 表示重复计数前最大累计数量，比如2的话，那就是1，2，1，2，不加此值则ItemsControl.AlternationIndex将只返回0-->
+<ItemsControl ItemsSource="{Binding DataContext, ElementName=gb_DSM_RERR}" AlternationCount="999">
+    <ItemsControl.ItemTemplate>
+        <DataTemplate>
+            <StackPanel DockPanel.Dock="Top" Height="25" Orientation="Horizontal">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Setters>
+                            <Setter Property="Margin" Value="0,5,0,0" />
+                        </Style.Setters>
+                        <Style.Triggers>
+                            <!--数据触发器，根据ItemsControl.AlternationIndex进行不同的设置-->
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=TemplatedParent}, Path=(ItemsControl.AlternationIndex)}" Value="0">
+                                <Setter Property="Margin" Value="0"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Label Content="{Binding Path=msg}" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Background="{Binding Path=color}" Foreground="White" Width="60" Margin="0,0,5,0">
+                    <Label.Effect>
+                        <DropShadowEffect Color="#FF999999" ShadowDepth="2" Direction="300"/>
+                    </Label.Effect>
+                </Label>
+                <TextBlock Text="監視時間：" VerticalAlignment="Center"></TextBlock>
+                <TextBlock Text="{Binding Path=date, StringFormat='yyyy-MM-dd HH:mm:ss'}" VerticalAlignment="Center"></TextBlock>
+            </StackPanel>
+        </DataTemplate>
+    </ItemsControl.ItemTemplate>
+</ItemsControl>
