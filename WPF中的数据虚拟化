@@ -29,7 +29,7 @@
     <ListBox.ItemTemplate>
         <DataTemplate>
             <GroupBox Header="{Binding Path=name}" VerticalAlignment="Top" DockPanel.Dock="Top">
-                <DockPanel Margin="5
+                <DockPanel Margin="5">
                 </DockPanel>
             </GroupBox>
         </DataTemplate>
