@@ -1,0 +1,2 @@
+TreeViewItem treeItem = tv.ItemContainerGenerator.ContainerFromItem(tv.Items[0]) as TreeViewItem;
+ContentPresenter cp = ((ContentPresenter)senddetial_list.ItemContainerGenerator.ContainerFromIndex(i));
