@@ -1,0 +1,16 @@
+App.xaml.cs中加入
+
+public App()
+{
+    Startup += new StartupEventHandler(delegate(object sender, StartupEventArgs e)
+    {
+        bool ret;
+        mutex = new System.Threading.Mutex(true, "ReceiveServerMonitoring", out ret);
+
+        if (!ret)
+        {
+            MessageBox.Show("系统已处于运行状态");
+            Environment.Exit(0);
+        }
+    });
+}
