@@ -1,0 +1,15 @@
+项目中出现“正在中止线程”问题，百度后台发现，都是因为用到Response.End、Response.Redirect 或 Server.Transfer 方法。
+
+原因：
+
+Response.End 方法终止页的执行，并将此执行切换到应用程序的事件管线中的 Application_EndRequest 事件，不执行 Response.End 后面的代码行。
+
+而 Response.Redirect 和 Server.Transfer 方法均在内部调用 Response.End.
+
+解决方法：
+
+HttpContext.Current.ApplicationInstance.CompleteRequest 替代Response.End；
+
+Response.Redirect的重载方法Response.Redirect(String url, bool endResponse)，替代Response.Redirect，该重载方法的endResponse 参数传递 false 以取消对 Response.End 的内部调用；
+
+Server.Execute替代Server.Transfer。
