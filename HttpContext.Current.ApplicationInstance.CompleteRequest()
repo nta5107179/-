@@ -1,0 +1,17 @@
+PRB：在使用 Response.End、Response.Redirect 或 server.Transfer 时出现 ThreadAbortException
+
+症状
+如果使用 Response.End、Response.Redirect 或 Server.Transfer 方法，将出现 ThreadAbortException 异常。您可以使用 try-catch 语句捕获此异常。
+
+原因
+Response.End 方法终止页的执行，并将此执行切换到应用程序的事件管线中的 Application_EndRequest 事件。不执行 Response.End 后面的代码行。
+
+此问题出现在 Response.Redirect 和 Server.Transfer 方法中，因为这两种方法均在内部调用 Response.End。
+
+解决方案
+要解决此问题，请使用下列方法之一： • 对于 Response.End，调用 HttpContext.Current.ApplicationInstance.completeRequest 方法而不是 Response.End 以跳过 Application_EndRequest 事件的代码执行。
+• 对于 Response.Redirect，请使用重载 Response.Redirect(String url, bool endResponse)，该重载对 endResponse 参数传递 false 以取消对 Response.End 的内部调用。例如：
+Response.Redirect ("nextpage.aspx", false);
+如果使用此替代方法，将执行 Response.Redirect 后面的代码。
+
+• 对于 Server.Transfer，请改用 Server.Execute 方法。
