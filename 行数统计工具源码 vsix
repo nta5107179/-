@@ -1,3 +1,11 @@
+vsct文件中修改
+<Groups>
+  <Group guid="guidCommandPackageCmdSet" id="MyMenuGroup" priority="0x0600">
+    <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+  </Group>
+</Groups>
+
+Command文件中修改
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
