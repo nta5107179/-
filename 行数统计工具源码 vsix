@@ -1,0 +1,218 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using EnvDTE;
+using EnvDTE80;
+using Microsoft;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using Task = System.Threading.Tasks.Task;
+
+namespace NumberOfStep
+{
+    /// <summary>
+    /// Command handler
+    /// </summary>
+    internal sealed class Command
+    {
+        /// <summary>
+        /// Command ID.
+        /// </summary>
+        public const int CommandId = 0x0100;
+
+        /// <summary>
+        /// Command menu group (command set GUID).
+        /// </summary>
+        public static readonly Guid CommandSet = new Guid("f5d50801-c068-4c1e-9f5d-564ba5e66825");
+
+        /// <summary>
+        /// VS Package that provides this command, not null.
+        /// </summary>
+        private readonly AsyncPackage package;
+
+        /// <summary>
+        /// 出力ウィンドウ
+        /// </summary>
+        IVsOutputWindowPane m_pane;
+
+        /// <summary>
+        /// DTEオブジェクト
+        /// </summary>
+        DTE2 _applicationObject;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Command"/> class.
+        /// Adds our command handlers for menu (commands must exist in the command table file)
+        /// </summary>
+        /// <param name="package">Owner package, not null.</param>
+        /// <param name="commandService">Command service to add command to, not null.</param>
+        private Command(AsyncPackage package, OleMenuCommandService commandService)
+        {
+            this.package = package ?? throw new ArgumentNullException(nameof(package));
+            commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
+
+            this.m_pane = m_pane ?? CreatePane(new Guid(), "ステップ数", true, true);
+            _applicationObject = ((IServiceProvider)package).GetService(typeof(DTE)) as DTE2;
+            Assumes.Present(_applicationObject);
+
+            var menuCommandID = new CommandID(CommandSet, CommandId);
+            var menuItem = new MenuCommand(this.Execute, menuCommandID);
+            commandService.AddCommand(menuItem);
+        }
+
+        /// <summary>
+        /// Gets the instance of the command.
+        /// </summary>
+        public static Command Instance
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// Gets the service provider from the owner package.
+        /// </summary>
+        private Microsoft.VisualStudio.Shell.IAsyncServiceProvider ServiceProvider
+        {
+            get
+            {
+                return this.package;
+            }
+        }
+
+        /// <summary>
+        /// Initializes the singleton instance of the command.
+        /// </summary>
+        /// <param name="package">Owner package, not null.</param>
+        public static async Task InitializeAsync(AsyncPackage package)
+        {
+            // Switch to the main thread - the call to AddCommand in Command's constructor requires
+            // the UI thread.
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
+
+            OleMenuCommandService commandService = await package.GetServiceAsync((typeof(IMenuCommandService))) as OleMenuCommandService;
+            Instance = new Command(package, commandService);
+        }
+
+        /// <summary>
+        /// This function is the callback used to execute the command when the menu item is clicked.
+        /// See the constructor to see how the menu item is associated with this function using
+        /// OleMenuCommandService service and MenuCommand class.
+        /// </summary>
+        /// <param name="sender">Event sender.</param>
+        /// <param name="e">Event args.</param>
+        private void Execute(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            string[] filePaths = GetSourceFilePath();
+            string[,] fileContents = new string[filePaths.Length, 2];
+
+            for (int i=0;i< filePaths.Length; i++)
+            {
+                if (File.Exists(filePaths[i]))
+                {
+                    string content = "";
+                    using (StreamReader sr = new StreamReader(filePaths[i]))
+                    {
+                        content = sr.ReadToEnd();
+                    }
+                    content = Regex.Replace(content, "", "", RegexOptions.Singleline);
+                    content = Regex.Replace(
+                        Regex.Replace(
+                            Regex.Replace(content, "^[\\s\\t]+\\/\\/.*$", "", RegexOptions.Multiline), 
+                        "[\\s\\t]+\\/\\*.*\\*\\/", "", RegexOptions.Singleline), 
+                    "(\\r|\\n)+", "\n", RegexOptions.Singleline);
+                    string[] strLen = content.Trim().Trim('\n').Split('\n');
+
+                    fileContents[i, 0] = filePaths[i];
+                    fileContents[i, 1] = strLen.Length.ToString();
+                }
+            }
+
+            //OutputWindowに出力
+            int contentLength = 150; //ファイルパスの桁数
+            int intervalLength = 10; //ファイルパスとステップ数の間に桁数
+            int allLength = contentLength + intervalLength + 10;//オール桁数
+
+            m_pane.Clear();
+            m_pane.Activate();
+            m_pane.OutputString("ステップ数計算：\r\n");
+            m_pane.OutputString("".PadRight(allLength, '-') + "\r\n");
+            for (int i=0;i< fileContents.Length / 2; i++)
+            {
+                string content = fileContents[i, 0];
+                string len = fileContents[i, 1];
+                StringBuilder sb = new StringBuilder();
+                sb.Append(content);
+                for (int j=0;j< contentLength - Encoding.Default.GetByteCount(content) + intervalLength; j++)
+                {
+                    sb.Append(" ");
+                }
+                m_pane.OutputString(sb.ToString() + len + "\r\n");
+            }
+            m_pane.OutputString("".PadRight(allLength, '-') + "\r\n");
+
+            // Find the output window.
+            Window outputWindow = _applicationObject.Windows.Item(EnvDTE.Constants.vsWindowKindOutput);
+            // Show the window. (You might want to make sure outputWindow is not null here...)
+            outputWindow.Visible = true;
+        }
+        /// <summary>
+        /// 選択したファイルズのパスアレイを取得
+        /// </summary>
+        /// <returns></returns>
+        private string[] GetSourceFilePath()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            List<string> filePaths = new List<string>();
+            
+            Assumes.Present(_applicationObject);
+            UIHierarchy uih = _applicationObject.ToolWindows.SolutionExplorer;
+            Array selectedItems = (Array)uih.SelectedItems;
+            if (null != selectedItems)
+            {
+                foreach (UIHierarchyItem selItem in selectedItems)
+                {
+                    ProjectItem prjItem = selItem.Object as ProjectItem;
+                    string filePath = prjItem.Properties.Item("FullPath").Value.ToString();
+                    //System.Windows.Forms.MessageBox.Show(selItem.Name + filePath);
+                    filePaths.Add(filePath);
+                }
+            }
+            return filePaths.ToArray();
+        }
+        /// <summary>
+        /// 出力ウィンドウを作成
+        /// </summary>
+        /// <param name="paneGuid">new Guid()</param>
+        /// <param name="title">見出し</param>
+        /// <param name="visible">表示するかどうか</param>
+        /// <param name="clearWithSolution">クリアするかどうか</param>
+        IVsOutputWindowPane CreatePane(Guid paneGuid, string title, bool visible, bool clearWithSolution)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            IVsOutputWindow output =
+                (IVsOutputWindow)((IServiceProvider)package).GetService(typeof(SVsOutputWindow));
+            Assumes.Present(output);
+
+            // Create a new pane.
+            IVsOutputWindowPane pane;
+            output.CreatePane(
+                ref paneGuid,
+                title,
+                Convert.ToInt32(visible),
+                Convert.ToInt32(clearWithSolution));
+
+            // Retrieve the new pane.
+            output.GetPane(ref paneGuid, out pane);
+
+            return pane;
+        }
+    }
+}
