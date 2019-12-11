@@ -1,0 +1,258 @@
+准备工作：
+
+public interface ICustomer
+
+{ }
+
+（一）方法
+
+（1）普通的方法
+
+在接口中添加3个方法：
+void AddCall();
+
+string GetCall();
+
+string GetCall(string strUser);
+
+ 
+
+Mock测试：
+
+var customer = new Mock<ICustomer>();
+
+ 
+
+customer.Setup(p=>p.AddCall());
+
+customer.Setup(p => p.GetCall()).Returns("phone:89898789");
+
+customer.Setup(p => p.GetCall("Tom")).Returns("Hello");
+
+ 
+
+customer.Object.AddCall();
+
+Assert.AreEqual("phone:89898789", customer.Object.GetCall());
+
+Assert.AreEqual("Hello", customer.Object.GetCall("Tom"));
+
+ 
+
+先是建立Icustomer接口的mock对象：customer，这个对象执行Icustomer接口的业务。
+
+然后对接口中的三个方法进行依赖添加：
+
+这里只说第三个方法：
+
+customer.Setup(p => p.GetCall("Tom")).Returns("Hello");
+
+customer对象的GetCall方法，传递参数Tom，得到返回值：Hello，相当于：
+
+string GetCall(“Tom”){return “Hello”;}
+
+ 
+
+测试，当调用无参数的GetCall()时，已经得知它会返回：phone:89898789
+
+当调用有参数的GetCall(string)时，如果参数是”Tom”，那么返回：Hello
+
+（2）带有引用或输出参数的方法
+
+string GetAddress(string strUser, out string Address);
+
+string GetFamilyCall(ref string strUser);
+
+ 
+
+var customer = new Mock<ICustomer>();
+
+var outString="oo";
+
+customer.Setup(p => p.GetAddress("", out outString)).Returns("shijiazhuang");
+
+customer.Setup(p => p.GetFamilyCall(ref outString)).Returns("xx");
+
+（3）有返回值的普通方法
+
+还用string GetCall(string strUser);
+
+这个进行测试，这里可以操作参数：
+
+var customer = new Mock<ICustomer>();
+
+customer.Setup(p => p.GetCall(It.IsAny<string>()))
+
+.Returns((string s) => "Hello "+s);
+
+Assert.AreEqual("Hello Tom",customer.Object.GetCall("Tom"));
+
+GetCall方法返回值是：Hello+调用参数
+
+（4）调用方法时抛出异常
+
+方法：void ShowException(string str);
+
+测试：
+
+var customer = new Mock<ICustomer>();
+
+customer.Setup(p => p.ShowException(string.Empty))
+
+.Throws(new Exception("参数不能为空！"));
+
+customer.Object.ShowException("");
+
+ 
+
+如果传入的参数是空值（string.Empty），那么调用这个方法时（Mock调用）就会触发异常。 
+
+（5）调用时赋值
+
+方法：void AddCall();
+
+Mock测试：
+
+var customer = new Mock<ICustomer>();
+
+int iCount = 0;
+
+ 
+
+customer.Setup(p => p.AddCall()).Callback(()=>iCount++);
+
+ 
+
+Assert.AreEqual(0, iCount);
+
+ 
+
+customer.Object.AddCall();
+
+Assert.AreEqual(1, iCount);
+
+ 
+
+customer.Object.AddCall();
+
+Assert.AreEqual(2, iCount);
+
+ 
+
+customer.Object.AddCall();
+
+Assert.AreEqual(3, iCount);
+
+ 
+
+ 
+
+（二）匹配参数
+
+var customer = new Mock<ICustomer>();
+
+customer.Setup(p => p.SelfMatch(It.IsAny<int>()))
+
+.Returns((int k) => "任何数：" + k);
+
+Console.WriteLine(customer.Object.SelfMatch(100));
+
+ 
+
+customer.Setup(p => p.SelfMatch(It.Is<int>(i => i % 2 == 0)))
+
+.Returns("偶数");
+
+Console.WriteLine(customer.Object.SelfMatch(100));
+
+ 
+
+customer.Setup(p => p.SelfMatch(It.IsInRange<int>(0, 10, Range.Inclusive)))
+
+.Returns("10以内的数");
+
+Console.WriteLine(customer.Object.SelfMatch(8));
+
+ 
+
+customer.Setup(p => p.ShowException(It.IsRegex(@"^\d+$")))
+
+.Throws(new Exception("不能是数字"));
+
+customer.Object.ShowException("r4");
+
+ 
+
+It用于添加参数约束，它有以下几个方法：
+
+Is<T>：匹配确定的给定类型
+
+IsAny<T>：匹配给定的任何值
+
+IsInRange<T>：匹配给定类型的范围
+
+IsRegex<T>：正则匹配
+
+ 
+
+通过示例来演示一下：
+
+（1）Is<T>
+
+customer.Setup(x => x.SelfMatch(It.Is<int>(i => i % 2 == 0))).Returns("1");
+
+ 
+
+方法SelfMatch接受int型参数，当参数为偶数时，才返回字符串1。
+
+i=>i%2==0这个表达式的意思在以前的随笔中已经解释过，详细可见：
+
+http://www.cnblogs.com/jams742003/archive/2009/12/23/1630737.html
+
+（2）IsAny<T>
+
+customer.Setup(p => p.SelfMatch(It.IsAny<int>())).Returns((int k) => "任何数：" + k);
+
+ 
+
+方法SelfMatch接受int型，且任何int型参数都可以，然后返回："任何数：" + k。
+
+这里说明一下Returns方法：
+
+ 
+
+Returns(Func<TResult>)
+
+Returns<T>(Func<T,TResult>)
+
+Returns<T1,T2>(Func<T1,T2,TResult>)
+
+Returns<T1,T2,T3>(Func<T1,T2,T3,TResult>)
+
+Returns<T1,T2,T3,T4>(Func<T1,T2,T3,T4,TResult>)
+
+Returns(TResult)
+
+ 
+
+在这个例子中，用到的就是第一种重载，关于Func委托，可以见我的：
+
+http://www.cnblogs.com/jams742003/archive/2009/10/31/1593393.html
+
+因为Func最多接受4个传入参数（有5个重载），所以这里的Returns带有Func委托参数的重载也有5个。
+
+（3）IsInRange<T>
+
+customer.Setup(p => p.SelfMatch(It.IsInRange<int>(0, 10, Range.Inclusive)))
+
+.Returns("10以内的数");
+
+方法SelfMatch接受int型，且当范围在[0,10]时，才返回10以内的数
+
+其中，这个方法，带有一个包含与排除开关。
+
+（4）IsRegex<T>
+
+customer.Setup(p => p.ShowException(It.IsRegex(@"^\d+$")))
+
+.Throws(new Exception("不能是数字"));
